@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Typing Game</title>
+    <style>
+        body { 
+            background: #121212; 
+            color: #eee; 
+            font-family: 'Consolas', monospace; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            margin: 0; 
+            overflow: hidden;
+        }
+        #target { 
+            font-size: 2.8rem; 
+            margin-bottom: 20px; 
+            letter-spacing: 0.1em; 
+            text-align: center;      
+            max-width: 90%;          
+            line-height: 1.4;        
+            word-wrap: break-word;   
+        }
+        .correct { color: #ffffff; }
+        .current { border-bottom: 3px solid #00e676; }
+        .wrong { background: #ff5252; color: #fff; }
+        
+        #info { 
+            opacity: 0; 
+            transition: 0.5s; 
+            text-align: center; 
+            max-width: 600px; 
+            margin-top: 20px;
+        }
+        #info.show { opacity: 1; }
+        
+        #trans { 
+            color: #00e676; 
+            font-size: 1.5rem; 
+            margin-bottom: 10px; 
+        }
+        #note { 
+            color: #aaa; 
+            font-size: 1.1rem; 
+            line-height: 1.6; 
+            margin-bottom: 20px; 
+        }
+        
+        #next-guide { 
+            color: #76e4af; 
+            font-size: 1.0rem; 
+            padding: 5px 0; 
+            display: inline-block;
+            animation: breathe 2.5s ease-in-out infinite; 
+        }
+
+        @keyframes breathe { 
+            0% { opacity: 0.3; } 
+            50% { opacity: 1; } 
+            100% { opacity: 0.3; } 
+        }
+    </style>
+</head>
+<body>
+    <div id="target">読み込み中...</div>
+    <div id="info">
+        <div id="trans"></div>
+        <div id="note"></div>
+        <div id="next-guide"></div>
+    </div>
+
+    <script>
+        let questions = [];
+        let qIdx = 0, charIdx = 0;
+        let isWaitingNext = false;
+        const targetEl = document.getElementById('target');
+        const infoEl = document.getElementById('info');
+        const guideEl = document.getElementById('next-guide');
+
+        async function loadQuestions() {
+            try {
+                // キャッシュ回避のためタイムスタンプを付与して読み込み
+                const res = await fetch('questions.json?v=' + new Date().getTime());
+                const data = await res.json();
+                
+                // 問題をランダムにシャッフル
+                questions = data.sort(() => Math.random() - 0.5);
+                
+                render();
+            } catch (e) {
+                targetEl.innerText = "JSONが見つかりません。先にPythonを実行してください。";
+            }
+        }
+
+        function render() {
+            const q = questions[qIdx];
+            targetEl.innerHTML = q.english.split('').map((c, i) => 
+                `<span class="${i === 0 ? 'current' : ''}">${c}</span>`).join('');
+            document.getElementById('trans').innerText = q.japanese;
+            document.getElementById('note').innerText = q.note;
+            guideEl.innerText = "";
+            infoEl.classList.remove('show');
+            charIdx = 0;
+            isWaitingNext = false;
+        }
+
+        window.addEventListener('keydown', e => {
+            if (isWaitingNext) {
+                // 文字、数字、エンター、スペースなどで次へ
+                if (e.key.length === 1 || e.key === 'Enter' || e.key === ' ') {
+                    qIdx = (qIdx + 1) % questions.length;
+                    render();
+                }
+                return;
+            }
+
+            if (e.key.length !== 1) return;
+            
+            const spans = targetEl.querySelectorAll('span');
+            const targetChar = questions[qIdx].english[charIdx];
+
+            if (e.key === targetChar) {
+                spans[charIdx].classList.add('correct');
+                spans[charIdx].classList.remove('current', 'wrong');
+                charIdx++;
+                if (charIdx < spans.length) {
+                    spans[charIdx].classList.add('current');
+                } else {
+                    infoEl.classList.add('show');
+                    guideEl.innerText = "Press any key to next";
+                    isWaitingNext = true;
+                }
+            } else {
+                spans[charIdx].classList.add('wrong');
+                setTimeout(() => spans[charIdx].classList.remove('wrong'), 100);
+            }
+        });
+
+        loadQuestions();
+    </script>
+</body>
+</html>
